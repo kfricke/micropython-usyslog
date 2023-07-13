@@ -1,11 +1,10 @@
 """
 This syslog client can send UDP packets to a remote syslog server.
 
-Timestamps are not supported for simplicity.
-
 For more information, see RFC 3164.
 """
 import usocket
+import time
 
 # Facility constants
 F_KERN = const(0)
@@ -43,6 +42,9 @@ S_NOTICE = const(5)
 S_INFO = const(6)
 S_DEBUG = const(7)
 
+WeekDay = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+
 class SyslogClient:
     def __init__(self, facility=F_USER):
         self._facility = facility
@@ -71,14 +73,24 @@ class SyslogClient:
     def warning(self, msg):
         self.log(S_WARN, msg)
 
+
 class UDPClient(SyslogClient):
-    def __init__(self, ip='127.0.0.1', port=514, facility=F_USER):
+    def __init__(
+        self, ip='127.0.0.1', my_ip='127.0.0.1', port=514, facility=F_USER):
         self._addr = usocket.getaddrinfo(ip, port)[0][4]
         self._sock = usocket.socket(usocket.AF_INET, usocket.SOCK_DGRAM)
+        self._my_ip = my_ip
         super().__init__(facility)
 
     def log(self, severity, msg):
-        data = "<%d>%s" % (severity + (self._facility << 3), msg)
+        year, _ , mday, hour, minute, second, weekday = list(time.localtime())[0:7]
+        time_string = '%s %2s %s:%s:%s' % (
+            WeekDay[weekday], mday, hour, minute, second)
+        data = "<%d>%s %s %s" % (
+            severity + (self._facility << 3),
+            time_string,
+            self._my_ip,
+            msg)
         self._sock.sendto(data.encode(), self._addr)
         
     def close(self):
